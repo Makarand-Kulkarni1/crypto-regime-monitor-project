@@ -4,11 +4,12 @@ The core automation script. Designed to run on a schedule (e.g. every 15 min
 via GitHub Actions cron).
 
 What it does each run:
-1. Fetches the latest candles from Binance (appends to market_data.db)
+1. Fetches the latest candles from Coinbase (appends to market_data.db)
 2. Computes features on the full history
 3. Loads the trained model
-4. Predicts the regime HORIZON candles ahead (the current forecast)
-5. Logs the prediction to a predictions table
+4. Predicts the regime HORIZON candles ahead (the current forecast), including
+   per-class probabilities for confidence display
+5. Logs the prediction (and probabilities) to a predictions table
 6. Compares against the previous run's prediction - if the forecasted regime
    changed, prints an alert (visible in GitHub Actions logs; can be wired to
    email/Slack/Telegram later)
@@ -41,9 +42,20 @@ def create_predictions_table(conn):
             latest_close REAL,
             predicted_regime TEXT,
             horizon_candles INTEGER,
-            regime_shift_detected INTEGER
+            regime_shift_detected INTEGER,
+            prob_high_vol_breakout REAL,
+            prob_low_vol_trending REAL,
+            prob_ranging_choppy REAL
         )
     """)
+    conn.commit()
+
+    # Migration: add probability columns if this table was created by an
+    # older version of this script that didn't have them yet.
+    existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(predictions)").fetchall()}
+    for col in ["prob_high_vol_breakout", "prob_low_vol_trending", "prob_ranging_choppy"]:
+        if col not in existing_cols:
+            conn.execute(f"ALTER TABLE predictions ADD COLUMN {col} REAL")
     conn.commit()
 
 
@@ -57,12 +69,18 @@ def get_last_prediction(conn):
 
 
 def log_prediction(conn, run_time, latest_candle_time, latest_close,
-                    predicted_regime, horizon, shift_detected):
+                    predicted_regime, horizon, shift_detected, prob_dict):
     conn.execute("""
         INSERT OR REPLACE INTO predictions
-        (run_time, latest_candle_time, latest_close, predicted_regime, horizon_candles, regime_shift_detected)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (run_time, str(latest_candle_time), latest_close, predicted_regime, horizon, int(shift_detected)))
+        (run_time, latest_candle_time, latest_close, predicted_regime, horizon_candles,
+         regime_shift_detected, prob_high_vol_breakout, prob_low_vol_trending, prob_ranging_choppy)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        run_time, str(latest_candle_time), latest_close, predicted_regime, horizon, int(shift_detected),
+        float(prob_dict.get("High-Vol Breakout", 0)),
+        float(prob_dict.get("Low-Vol Trending", 0)),
+        float(prob_dict.get("Ranging / Choppy", 0)),
+    ))
     conn.commit()
 
 
@@ -129,7 +147,7 @@ def main():
 
     # --- 6. Log this run ---
     log_prediction(conn, run_time, latest_candle_time, latest_close,
-                    predicted_regime, horizon, shift_detected)
+                    predicted_regime, horizon, shift_detected, prob_dict)
 
     conn.close()
     print("=== Prediction run complete ===")
