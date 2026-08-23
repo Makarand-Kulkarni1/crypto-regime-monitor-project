@@ -1,0 +1,39 @@
+name: Live Regime Prediction
+
+# Runs automatically every 15 minutes
+"on":
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+# Needed so the workflow can commit the updated database/predictions back to the repo
+permissions:
+  contents: write
+
+jobs:
+  predict:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run prediction pipeline
+        working-directory: src
+        run: python predict.py --symbol BTCUSDT --interval 15m
+
+      - name: Commit updated data back to repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/market_data.db
+          git diff --quiet --cached || git commit -m "Automated prediction run: $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git push
