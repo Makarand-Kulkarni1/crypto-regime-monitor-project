@@ -18,7 +18,7 @@ The system runs **continuously and unattended in the cloud**: every 15 minutes, 
 
 **[🔗 Live Dashboard →](https://crypto-regime-monitor-project.streamlit.app/)**
 
-![Dashboard Overview](assets/screenshots/dashboard-overview.png)
+![Dashboard Overview](assets/dashboard-overview.png)
 *Current predicted regime, latest price, and live model accuracy — updated automatically every 15 minutes.*
 
 ---
@@ -135,16 +135,16 @@ The entire prediction pipeline runs **without any manual intervention**, via a G
 The Streamlit dashboard (`src/dashboard.py`) provides live, closed-loop monitoring — not just a static display of predictions.
 
 **Live accuracy tracking** — the standout feature. The dashboard automatically checks past predictions against what actually happened once enough time has passed, and plots cumulative accuracy against a naive baseline. This is genuine closed-loop model monitoring, the same concept real MLOps systems use in production:
-![Live accuracy tracking](assets/screenshots/live-accuracy-chart.png)
+![Live accuracy tracking](assets/live-accuracy-chart.png)
 
 **Price history, color-coded by predicted regime:**
-![Price history chart](assets/screenshots/price-history-chart.png)
+![Price history chart](assets/price-history-chart.png)
 
 **Regime distribution and feature importance** — showing what's actually driving the model's predictions, not a black box:
-![Regime distribution and feature importance](assets/screenshots/regime-distribution-feature-importance.png)
+![Regime distribution and feature importance](assets/regime-distribution-feature-importance.png)
 
 **Recent predictions log:**
-![Recent predictions log](assets/screenshots/recent-predictions-table.png)
+![Recent predictions log](assets/recent-predictions-table.png)
 
 Run locally:
 ```bash
