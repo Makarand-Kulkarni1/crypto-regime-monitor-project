@@ -181,7 +181,7 @@ To enable the cloud automation on your own fork: push to GitHub, enable **Settin
 
 - Trained on a single asset (BTC/USD) and a single timeframe (15-minute candles) — not yet validated across other pairs or intervals
 - Backtested accuracy was ~63% vs. a ~44% naive baseline. **Live production accuracy is being tracked in real time by the dashboard itself** (see screenshot above) — as of this writing it's around 61% on a still-small sample of resolved predictions, and will become more statistically meaningful as more predictions accumulate over time. This live number, not the backtest number, is the one to trust as the sample grows — which is exactly why the tracker exists rather than just reporting a single static backtest score.
-- Labeling is rule-based (quantile thresholds), not ground truth — a reasonable and explainable approach given no true regime labels exist, but a design choice worth defending, not treating as objective fact
+- Labeling is rule-based (quantile thresholds), not ground truth — a reasonable and explainable approach given no true regime labels exist, but a design choice worth defending, not treating as objective fact.
 
 ---
 
