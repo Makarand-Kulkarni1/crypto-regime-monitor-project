@@ -224,20 +224,59 @@ def main():
             majority_baseline = outcomes["actual_regime"].value_counts(normalize=True).max()
             st.metric("Naive Baseline", f"{majority_baseline:.0%}", help="Accuracy of always guessing the most common regime")
 
-        # Rolling accuracy over time
+        # Cumulative accuracy (slow-reacting, mixes early noisy data with recent performance)
+        # AND rolling window accuracy (last N predictions - reacts to recent performance,
+        # much better for spotting real drift vs. early sampling noise settling out)
         outcomes_sorted = outcomes.sort_values("run_time").reset_index(drop=True)
-        outcomes_sorted["rolling_accuracy"] = outcomes_sorted["correct"].expanding(min_periods=1).mean()
+        outcomes_sorted["cumulative_accuracy"] = outcomes_sorted["correct"].expanding(min_periods=1).mean()
+
+        ROLLING_WINDOW = 50
+        outcomes_sorted["rolling_accuracy"] = (
+            outcomes_sorted["correct"].rolling(window=ROLLING_WINDOW, min_periods=10).mean()
+        )
 
         fig_acc = go.Figure()
         fig_acc.add_trace(go.Scatter(
+            x=outcomes_sorted["run_time"], y=outcomes_sorted["cumulative_accuracy"],
+            mode="lines", name="Cumulative Accuracy", line=dict(color="#3498db", width=1.5),
+            opacity=0.55
+        ))
+        fig_acc.add_trace(go.Scatter(
             x=outcomes_sorted["run_time"], y=outcomes_sorted["rolling_accuracy"],
-            mode="lines+markers", name="Cumulative Accuracy", line=dict(color="#3498db")
+            mode="lines+markers", name=f"Rolling Accuracy (last {ROLLING_WINDOW})",
+            line=dict(color="#e67e22", width=2.5)
         ))
         fig_acc.add_hline(y=majority_baseline, line_dash="dash", line_color="gray",
                            annotation_text="Naive baseline")
-        fig_acc.update_layout(height=250, yaxis=dict(range=[0, 1], tickformat=".0%"),
-                               margin=dict(l=10, r=10, t=10, b=10))
+        fig_acc.update_layout(height=280, yaxis=dict(range=[0, 1], tickformat=".0%"),
+                               margin=dict(l=10, r=10, t=10, b=10),
+                               legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig_acc, use_container_width=True)
+
+        # Simple drift verdict: is the recent rolling accuracy meaningfully below the
+        # all-time cumulative figure? Flag it plainly rather than making the user eyeball it.
+        recent_rolling = outcomes_sorted["rolling_accuracy"].dropna()
+        if len(recent_rolling) >= 10:
+            latest_rolling = recent_rolling.iloc[-1]
+            gap = overall_accuracy - latest_rolling
+            if gap > 0.08:
+                st.warning(
+                    f"⚠️ Recent accuracy (last {ROLLING_WINDOW}: {latest_rolling:.0%}) is running "
+                    f"noticeably below the all-time average ({overall_accuracy:.0%}). This may indicate "
+                    f"the model's performance is drifting - worth investigating feature distribution shift "
+                    f"or considering a retrain."
+                )
+            elif latest_rolling < majority_baseline:
+                st.error(
+                    f"🔴 Recent accuracy (last {ROLLING_WINDOW}: {latest_rolling:.0%}) has dropped "
+                    f"below the naive baseline ({majority_baseline:.0%}). The model is currently "
+                    f"underperforming a simple majority-class guess - retraining should be a priority."
+                )
+            else:
+                st.success(
+                    f"✅ Recent accuracy (last {ROLLING_WINDOW}: {latest_rolling:.0%}) is holding "
+                    f"steady and consistent with the all-time average."
+                )
 
     st.divider()
 
